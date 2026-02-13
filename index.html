@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Grocery List</title>
+  <style>
+    :root{
+      --red:#D62828;
+      --blue:#003049;
+      --bg:#F8F9FA;
+      --white:#ffffff;
+      --muted:#6b7280;
+      font-family:'Poppins',sans-serif;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      min-height:100vh;
+      background:linear-gradient(135deg,#f9fbff 0%,#fff5f5 100%);
+      color:var(--blue);
+      display:flex;
+      justify-content:center;
+      align-items:flex-start;
+      padding:24px;
+    }
+    .app{
+      width:100%;
+      max-width:700px;
+      background:var(--white);
+      border-radius:12px;
+      box-shadow:0 10px 30px rgba(0,0,0,0.08);
+      overflow:hidden;
+      border-top:6px solid var(--blue);
+    }
+    header{
+      background:linear-gradient(90deg,var(--blue),var(--red));
+      color:white;
+      padding:18px 22px;
+    }
+    header h1{margin:0;font-size:22px;}
+    header p{margin:4px 0 0 0;font-size:13px;opacity:0.9;}
+    .container{padding:20px;}
+    form label{display:block;margin:8px 0 4px;font-size:13px;color:var(--muted);}
+    input{
+      width:100%;
+      padding:10px;
+      border:1px solid #e5e7eb;
+      border-radius:8px;
+      font-size:14px;
+    }
+    .btn{
+      background:var(--red);
+      color:white;
+      border:none;
+      border-radius:8px;
+      padding:10px 14px;
+      cursor:pointer;
+      font-weight:600;
+    }
+    .btn.secondary{background:var(--blue);}
+    .list{margin-top:20px;display:grid;gap:12px;}
+    .item{
+      border:1px solid #e5e7eb;
+      border-radius:10px;
+      padding:12px 14px;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      background:linear-gradient(180deg,#ffffff,#fbfcff);
+    }
+    .info h3{margin:0;font-size:16px;}
+    .price{color:var(--red);font-weight:600;}
+    .actions button{
+      background:transparent;
+      border:none;
+      cursor:pointer;
+      font-size:18px;
+    }
+    .empty{text-align:center;color:var(--muted);padding:24px;border:1px dashed #ddd;border-radius:8px;}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>Grocery List Manager 🛒</h1>
+      <p>Add, edit, or delete grocery items with name and price.</p>
+    </header>
+
+    <div class="container">
+      <form id="grocery-form">
+        <label>Item name</label>
+        <input type="text" id="name" placeholder="e.g. Tomatoes" required />
+
+        <label>Price (₹)</label>
+        <input type="number" id="price" placeholder="e.g. 40" min="0" />
+
+        <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn" type="submit" id="save-btn">Add Item</button>
+          <button class="btn secondary" type="button" id="clear-all">Clear All</button>
+        </div>
+      </form>
+
+      <div class="list" id="list"></div>
+      <div class="empty" id="empty">No grocery items yet — start adding!</div>
+    </div>
+  </div>
+
+  <script>
+    const nameEl=document.getElementById("name");
+    const priceEl=document.getElementById("price");
+    const listEl=document.getElementById("list");
+    const emptyEl=document.getElementById("empty");
+    const form=document.getElementById("grocery-form");
+    const saveBtn=document.getElementById("save-btn");
+    const clearAllBtn=document.getElementById("clear-all");
+    const LS_KEY="grocery_items_v2";
+    let items=[];
+    let editId=null;
+
+    function uid(){return 'id_'+Math.random().toString(36).slice(2,9);}
+    function saveLocal(){localStorage.setItem(LS_KEY,JSON.stringify(items));}
+    function loadLocal(){try{items=JSON.parse(localStorage.getItem(LS_KEY))||[]}catch{items=[];}}
+
+    function render(){
+      listEl.innerHTML="";
+      if(items.length===0){emptyEl.style.display="block";return;}
+      emptyEl.style.display="none";
+      items.forEach(item=>{
+        const div=document.createElement("div");
+        div.className="item";
+        div.innerHTML=`
+          <div class="info">
+            <h3>${item.name}</h3>
+          </div>
+          <div class="price">₹${item.price||0}</div>
+          <div class="actions">
+            <button data-id="${item.id}" data-act="edit" title="Edit">✏️</button>
+            <button data-id="${item.id}" data-act="del" title="Delete">🗑️</button>
+          </div>`;
+        listEl.appendChild(div);
+      });
+    }
+
+    form.addEventListener("submit",(e)=>{
+      e.preventDefault();
+      const name=nameEl.value.trim();
+      const price=priceEl.value.trim();
+      if(!name)return alert("Enter item name");
+      if(editId){
+        const idx=items.findIndex(i=>i.id===editId);
+        if(idx>=0){items[idx].name=name;items[idx].price=price;}
+        editId=null;saveBtn.textContent="Add Item";
+      }else{
+        items.push({id:uid(),name,price});
+      }
+      saveLocal();render();
+      form.reset();nameEl.focus();
+    });
+
+    listEl.addEventListener("click",(e)=>{
+      const btn=e.target.closest("button");
+      if(!btn)return;
+      const id=btn.dataset.id;
+      const act=btn.dataset.act;
+      if(act==="del"){
+        if(confirm("Delete this item?")){
+          items=items.filter(i=>i.id!==id);
+          saveLocal();render();
+        }
+      }else if(act==="edit"){
+        const it=items.find(i=>i.id===id);
+        if(!it)return;
+        nameEl.value=it.name;
+        priceEl.value=it.price;
+        editId=id;
+        saveBtn.textContent="Update Item";
+      }
+    });
+
+    clearAllBtn.addEventListener("click",()=>{
+      if(confirm("Clear all grocery items?")){
+        items=[];saveLocal();render();
+      }
+    });
+
+    loadLocal();
+    render();
+  </script>
+</body>
+</html>
